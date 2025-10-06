@@ -21,7 +21,10 @@
                     <button data-range="month" class="focus-filter" role="radio" aria-checked="false">近一月</button>
                     <button data-range="year" class="focus-filter" role="radio" aria-checked="false">近一年</button>
                 </div>
-                <div class="focus-chart" id="focusChart" aria-live="polite"></div>
+                <div class="focus-chart" id="focusChart" aria-live="polite">
+                    <canvas id="focusChartCanvas" role="img" aria-label="专注时间柱形图"></canvas>
+                    <div class="focus-chart-empty" id="focusChartEmpty">暂无专注记录</div>
+                </div>
             </div>
         </aside>
 
@@ -59,6 +62,7 @@
 
     <button id="fullscreenBtn" type="button" title="全屏显示">全屏</button>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="fireworks.js"></script>
     <script>
@@ -122,6 +126,9 @@
         const focusPanelBody = document.getElementById('focusPanelBody');
         const focusCollapseBtn = document.getElementById('focusCollapseBtn');
         const focusChart = document.getElementById('focusChart');
+    const focusChartCanvas = document.getElementById('focusChartCanvas');
+    const focusChartEmpty = document.getElementById('focusChartEmpty');
+    let focusChartInstance = null;
         const focusFilterButtons = Array.from(document.querySelectorAll('.focus-filter'));
 
         let quickTimes = [...quickTimesDefault];
@@ -132,6 +139,11 @@
         let currentSessionDuration = 0;
         let focusSessions = [];
         let currentFocusRange = 'week';
+
+        function getDateKey(date) {
+            const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+            return adjusted.toISOString().slice(0, 10);
+        }
 
         function loadQuickTimes() {
             const saved = localStorage.getItem(QUICK_TIMES_KEY);
@@ -417,7 +429,7 @@
             focusSessions.forEach(session => {
                 const completed = new Date(session.completedAt);
                 if (completed >= start && completed <= now) {
-                    const key = completed.toISOString().slice(0, 10);
+                    const key = getDateKey(completed);
                     dayTotals.set(key, (dayTotals.get(key) || 0) + (session.durationSeconds || 0));
                 }
             });
@@ -425,7 +437,7 @@
             const data = [];
             const cursor = new Date(start);
             while (cursor <= now) {
-                const isoDate = cursor.toISOString().slice(0, 10);
+                const isoDate = getDateKey(cursor);
                 data.push({
                     date: isoDate,
                     label: `${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
@@ -435,48 +447,101 @@
             }
 
             const hasData = data.some(item => item.seconds > 0);
-            focusChart.innerHTML = '';
+            if (!focusChart || !focusChartCanvas) return;
 
             if (!hasData) {
-                const empty = document.createElement('div');
-                empty.className = 'focus-empty';
-                empty.textContent = '暂无专注记录';
-                focusChart.appendChild(empty);
+                focusChartCanvas.style.display = 'none';
+                focusChartEmpty?.classList.add('show');
+                if (focusChartInstance) {
+                    focusChartInstance.destroy();
+                    focusChartInstance = null;
+                }
                 return;
             }
 
-            const maxSeconds = Math.max(...data.map(item => item.seconds));
-            const chartInner = document.createElement('div');
-            chartInner.className = 'focus-chart-inner';
+            focusChartCanvas.style.display = 'block';
+            focusChartEmpty?.classList.remove('show');
 
-            data.forEach(item => {
-                const barItem = document.createElement('div');
-                barItem.className = 'focus-bar-item';
+            const labels = data.map(item => item.label);
+            const minutesData = data.map(item => Math.round((item.seconds / 60) * 10) / 10);
 
-                const value = document.createElement('span');
-                value.className = 'focus-bar-value';
-                value.textContent = formatDurationShort(item.seconds);
+            const ctx = focusChartCanvas.getContext('2d');
+            if (!ctx) return;
 
-                const bar = document.createElement('div');
-                bar.className = 'focus-bar';
-                const heightPercent = maxSeconds ? Math.round((item.seconds / maxSeconds) * 100) : 0;
-                bar.style.height = `${heightPercent}%`;
-                if (!item.seconds) {
-                    bar.classList.add('empty');
-                }
-                bar.title = `${item.date} · ${formatDuration(item.seconds)}`;
+            const maxMinutes = Math.max(...minutesData);
 
-                const label = document.createElement('span');
-                label.className = 'focus-bar-label';
-                label.textContent = item.label;
-
-                barItem.appendChild(value);
-                barItem.appendChild(bar);
-                barItem.appendChild(label);
-                chartInner.appendChild(barItem);
-            });
-
-            focusChart.appendChild(chartInner);
+            if (focusChartInstance) {
+                focusChartInstance.data.labels = labels;
+                focusChartInstance.data.datasets[0].data = minutesData;
+                focusChartInstance.options.scales.y.suggestedMax = maxMinutes ? maxMinutes * 1.1 : undefined;
+                focusChartInstance.update();
+            } else {
+                focusChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: '专注时间 (分钟)',
+                            data: minutesData,
+                            backgroundColor: 'rgba(0, 255, 214, 0.45)',
+                            borderColor: 'rgba(0, 255, 214, 0.8)',
+                            borderWidth: 1,
+                            borderRadius: 8,
+                            maxBarThickness: 40
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 400 },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(5, 9, 20, 0.92)',
+                                borderColor: 'rgba(0, 255, 214, 0.4)',
+                                borderWidth: 1,
+                                callbacks: {
+                                    label: context => {
+                                        const minutes = context.raw || 0;
+                                        const seconds = Math.round(minutes * 60);
+                                        return `专注 ${formatDuration(seconds)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: {
+                                    color: 'var(--text-dim)',
+                                    maxRotation: 0,
+                                    autoSkipPadding: 12,
+                                    font: { size: 11 }
+                                },
+                                border: { display: false }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    color: 'var(--text-dim)',
+                                    font: { size: 11 },
+                                    callback: value => {
+                                        const seconds = Math.round(value * 60);
+                                        return formatDurationShort(seconds) || '0m';
+                                    }
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.08)'
+                                },
+                                border: { display: false }
+                            }
+                        },
+                        layout: {
+                            padding: { top: 10, bottom: 0, left: 4, right: 4 }
+                        }
+                    }
+                });
+            }
         }
 
         function updateFocusCollapse(collapsed) {
