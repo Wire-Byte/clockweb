@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>自定义倒计时</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="background.css">
 </head>
 <body>
-    <div class="stars"></div>
-    <div class="twinkling"></div>
+    <div id="particles-js"></div>
 
     <div class="layout" id="layout">
         <aside class="focus-panel" id="focusPanel" aria-label="专注统计" aria-expanded="true">
@@ -61,9 +59,44 @@
 
     <button id="fullscreenBtn" type="button" title="全屏显示">全屏</button>
 
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script src="fireworks.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', () => {
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: '#00a8ff' },
+                shape: { type: 'circle' },
+                opacity: { value: 0.5, random: true },
+                size: { value: 3, random: true },
+                line_linked: {
+                    enable: true,
+                    distance: 150,
+                    color: '#9c88ff',
+                    opacity: 0.4,
+                    width: 1
+                },
+                move: {
+                    enable: true,
+                    speed: 2,
+                    direction: 'none',
+                    random: true,
+                    straight: false,
+                    out_mode: 'out',
+                    bounce: false
+                }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: {
+                    onhover: { enable: true, mode: 'repulse' },
+                    onclick: { enable: true, mode: 'push' },
+                    resize: true
+                }
+            },
+            retina_detect: true
+        });
         const QUICK_TIMES_KEY = 'quickTimes';
         const FOCUS_SESSIONS_KEY = 'focusSessions';
         const FOCUS_RANGE_KEY = 'focusSelectedRange';
