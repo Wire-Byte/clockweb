@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义倒计时</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="background.css">
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="twinkling"></div>
+
+    <div class="layout" id="layout">
+        <aside class="focus-panel" id="focusPanel" aria-label="专注统计" aria-expanded="true">
+            <div class="focus-panel-header">
+                <span class="focus-title">专注统计</span>
+                <button id="focusCollapseBtn" class="focus-collapse" aria-label="折叠统计面板" aria-expanded="true" type="button">⯇</button>
+            </div>
+            <div class="focus-panel-body" id="focusPanelBody">
+                <div class="focus-filters" id="focusFilters" role="radiogroup" aria-label="统计范围">
+                    <button data-range="week" class="focus-filter" role="radio" aria-checked="true">近一周</button>
+                    <button data-range="month" class="focus-filter" role="radio" aria-checked="false">近一月</button>
+                    <button data-range="year" class="focus-filter" role="radio" aria-checked="false">近一年</button>
+                </div>
+                <div class="focus-chart" id="focusChart" aria-live="polite"></div>
+            </div>
+        </aside>
+
+        <main class="app" id="app" role="main">
+            <div class="app-inner">
+                <h1 class="title">Focus Timer</h1>
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+
+                <div class="time-input" aria-label="设置倒计时">
+                    <label>
+                        小时
+                        <input id="hours" type="number" min="0" max="23" value="0" aria-label="小时">
+                    </label>
+                    <label>
+                        分钟
+                        <input id="minutes" type="number" min="0" max="59" value="25" aria-label="分钟">
+                    </label>
+                    <label>
+                        秒
+                        <input id="seconds" type="number" min="0" max="59" value="0" aria-label="秒">
+                    </label>
+                </div>
+
+                <div class="quick-times" id="quickTimes" aria-label="常用时间预设"></div>
+
+                <div class="controls" aria-label="倒计时控制">
+                    <button id="startBtn" type="button">开始</button>
+                    <button id="pauseBtn" type="button" title="暂停"></button>
+                    <button id="resetBtn" type="button">重置</button>
+                </div>
+            </div>
+        </main>
+        <div class="layout-spacer" aria-hidden="true"></div>
+    </div>
+
+    <button id="fullscreenBtn" type="button" title="全屏显示">全屏</button>
+
+    <script src="fireworks.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const QUICK_TIMES_KEY = 'quickTimes';
+        const FOCUS_SESSIONS_KEY = 'focusSessions';
+        const FOCUS_RANGE_KEY = 'focusSelectedRange';
+        const FOCUS_COLLAPSED_KEY = 'focusPanelCollapsed';
+
+        const quickTimesDefault = [
+            { label: '25:00', h: 0, m: 25, s: 0 },
+            { label: '05:00', h: 0, m: 5, s: 0 },
+            { label: '01:00', h: 0, m: 1, s: 0 }
+        ];
+
+        const timerDisplay = document.getElementById('timerDisplay');
+        const hoursInput = document.getElementById('hours');
+        const minutesInput = document.getElementById('minutes');
+        const secondsInput = document.getElementById('seconds');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const quickTimesDiv = document.getElementById('quickTimes');
+
+        const focusPanel = document.getElementById('focusPanel');
+        const focusPanelBody = document.getElementById('focusPanelBody');
+        const focusCollapseBtn = document.getElementById('focusCollapseBtn');
+        const focusChart = document.getElementById('focusChart');
+        const focusFilterButtons = Array.from(document.querySelectorAll('.focus-filter'));
+
+        let quickTimes = [...quickTimesDefault];
+        let totalSeconds = 0;
+        let interval = null;
+        let initial = { h: 0, m: 25, s: 0 };
+        let paused = false;
+        let currentSessionDuration = 0;
+        let focusSessions = [];
+        let currentFocusRange = 'week';
+
+        function loadQuickTimes() {
+            const saved = localStorage.getItem(QUICK_TIMES_KEY);
+            if (!saved) {
+                quickTimes = [...quickTimesDefault];
+                return;
+            }
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length) {
+                    quickTimes = parsed;
+                } else {
+                    quickTimes = [...quickTimesDefault];
+                }
+            } catch (error) {
+                quickTimes = [...quickTimesDefault];
+            }
+        }
+
+        function saveQuickTimes() {
+            localStorage.setItem(QUICK_TIMES_KEY, JSON.stringify(quickTimes));
+        }
+
+        function renderQuickTimes() {
+            if (!quickTimesDiv) return;
+            quickTimesDiv.innerHTML = '';
+            quickTimes.forEach((qt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quick-btn';
+                btn.type = 'button';
+                btn.textContent = qt.label;
+                btn.addEventListener('click', () => {
+                    hoursInput.value = qt.h;
+                    minutesInput.value = qt.m;
+                    secondsInput.value = qt.s;
+                    totalSeconds = qt.h * 3600 + qt.m * 60 + qt.s;
+                    updateDisplay(totalSeconds);
+                });
+                btn.addEventListener('dblclick', () => {
+                    const h = prompt('小时', qt.h);
+                    if (h === null) return;
+                    const m = prompt('分钟', qt.m);
+                    if (m === null) return;
+                    const s = prompt('秒', qt.s);
+                    if (s === null) return;
+                    const hVal = parseInt(h, 10) || 0;
+                    const mVal = parseInt(m, 10) || 0;
+                    const sVal = parseInt(s, 10) || 0;
+                    quickTimes[idx] = {
+                        label: `${hVal}:${String(mVal).padStart(2, '0')}${sVal ? ':' + String(sVal).padStart(2, '0') : ''}`,
+                        h: hVal,
+                        m: mVal,
+                        s: sVal
+                    };
+                    saveQuickTimes();
+                    renderQuickTimes();
+                });
+                quickTimesDiv.appendChild(btn);
+            });
+            const addBtn = document.createElement('button');
+            addBtn.className = 'quick-btn';
+            addBtn.type = 'button';
+            addBtn.textContent = '+ 新建';
+            addBtn.addEventListener('click', () => {
+                const h = prompt('小时', 0);
+                if (h === null) return;
+                const m = prompt('分钟', 0);
+                if (m === null) return;
+                const s = prompt('秒', 0);
+                if (s === null) return;
+                const hVal = parseInt(h, 10) || 0;
+                const mVal = parseInt(m, 10) || 0;
+                const sVal = parseInt(s, 10) || 0;
+                quickTimes.push({
+                    label: `${hVal}:${String(mVal).padStart(2, '0')}${sVal ? ':' + String(sVal).padStart(2, '0') : ''}`,
+                    h: hVal,
+                    m: mVal,
+                    s: sVal
+                });
+                saveQuickTimes();
+                renderQuickTimes();
+            });
+            quickTimesDiv.appendChild(addBtn);
+        }
+
+        function updateDisplay(sec) {
+            const units = ['hours', 'minutes', 'seconds'];
+            const values = [
+                Math.max(0, Math.floor(sec / 3600)),
+                Math.max(0, Math.floor((sec % 3600) / 60)),
+                Math.max(0, sec % 60)
+            ];
+            const groups = values.map((value, index) => {
+                const digits = String(value).padStart(2, '0');
+                return `<span class="timer-group" data-unit="${units[index]}">${digits}</span>`;
+            });
+            timerDisplay.innerHTML = groups.join('');
+        }
+
+        function setPauseBtn(isPaused) {
+            if (!pauseBtn) return;
+            paused = isPaused;
+            if (isPaused) {
+                pauseBtn.setAttribute('data-paused', '1');
+                pauseBtn.title = '继续';
+                pauseBtn.textContent = '';
+            } else {
+                pauseBtn.removeAttribute('data-paused');
+                pauseBtn.title = '暂停';
+                pauseBtn.textContent = '';
+            }
+        }
+
+        function clearTimer() {
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        }
+
+        function handleCountdownComplete() {
+            updateDisplay(0);
+            clearTimer();
+            timerDisplay.classList.add('completed');
+            recordFocusSession(currentSessionDuration);
+            currentSessionDuration = 0;
+            setPauseBtn(false);
+            if (typeof showFireworks === 'function') {
+                showFireworks();
+            }
+        }
+
+        function startTicking() {
+            clearTimer();
+            interval = setInterval(() => {
+                totalSeconds -= 1;
+                if (totalSeconds <= 0) {
+                    handleCountdownComplete();
+                } else {
+                    updateDisplay(totalSeconds);
+                }
+            }, 1000);
+        }
+
+        function startCountdown() {
+            const h = parseInt(hoursInput.value, 10) || 0;
+            const m = parseInt(minutesInput.value, 10) || 0;
+            const s = parseInt(secondsInput.value, 10) || 0;
+            totalSeconds = h * 3600 + m * 60 + s;
+            initial = { h, m, s };
+            currentSessionDuration = totalSeconds;
+            if (totalSeconds <= 0) {
+                updateDisplay(0);
+                return;
+            }
+            timerDisplay.classList.remove('completed');
+            updateDisplay(totalSeconds);
+            setPauseBtn(false);
+            startTicking();
+        }
+
+        function resetCountdown() {
+            clearTimer();
+            hoursInput.value = initial.h;
+            minutesInput.value = initial.m;
+            secondsInput.value = initial.s;
+            totalSeconds = initial.h * 3600 + initial.m * 60 + initial.s;
+            currentSessionDuration = totalSeconds;
+            timerDisplay.classList.remove('completed');
+            updateDisplay(totalSeconds);
+            setPauseBtn(false);
+        }
+
+        function pauseCountdown() {
+            if (!totalSeconds) return;
+            if (interval) {
+                clearTimer();
+                setPauseBtn(true);
+            } else if (paused) {
+                setPauseBtn(false);
+                startTicking();
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen?.();
+            }
+        }
+
+        function loadFocusSessions() {
+            const stored = localStorage.getItem(FOCUS_SESSIONS_KEY);
+            if (!stored) {
+                focusSessions = [];
+                return;
+            }
+            try {
+                const parsed = JSON.parse(stored);
+                focusSessions = Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                focusSessions = [];
+            }
+        }
+
+        function saveFocusSessions() {
+            localStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(focusSessions));
+        }
+
+        function recordFocusSession(durationSeconds) {
+            if (!durationSeconds || durationSeconds <= 0) return;
+            loadFocusSessions();
+            focusSessions.push({
+                completedAt: new Date().toISOString(),
+                durationSeconds
+            });
+            saveFocusSessions();
+            renderFocusChart(currentFocusRange);
+        }
+
+        function getRangeStart(range) {
+            const now = new Date();
+            now.setHours(23, 59, 59, 999);
+            const start = new Date(now);
+            start.setHours(0, 0, 0, 0);
+            let days = 7;
+            switch (range) {
+                case 'month':
+                    days = 30;
+                    break;
+                case 'year':
+                    days = 365;
+                    break;
+                default:
+                    days = 7;
+            }
+            start.setDate(start.getDate() - (days - 1));
+            return start;
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds || seconds <= 0) return '0分';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            const parts = [];
+            if (h) parts.push(`${h}小时`);
+            if (m) parts.push(`${m}分`);
+            if (!h && !m && s) parts.push(`${s}秒`);
+            return parts.join('') || '0分';
+        }
+
+        function formatDurationShort(seconds) {
+            if (!seconds || seconds <= 0) return '';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h) return `${h}h${m ? m : 0}m`;
+            if (m) return `${m}m`;
+            return `${seconds}s`;
+        }
+
+        function setActiveFocusFilter(range) {
+            focusFilterButtons.forEach(btn => {
+                const isActive = btn.dataset.range === range;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+            });
+        }
+
+        function renderFocusChart(range = currentFocusRange) {
+            if (!focusChart) return;
+            currentFocusRange = range;
+            localStorage.setItem(FOCUS_RANGE_KEY, currentFocusRange);
+            setActiveFocusFilter(currentFocusRange);
+            loadFocusSessions();
+
+            const now = new Date();
+            now.setHours(23, 59, 59, 999);
+            const start = getRangeStart(currentFocusRange);
+            const dayTotals = new Map();
+
+            focusSessions.forEach(session => {
+                const completed = new Date(session.completedAt);
+                if (completed >= start && completed <= now) {
+                    const key = completed.toISOString().slice(0, 10);
+                    dayTotals.set(key, (dayTotals.get(key) || 0) + (session.durationSeconds || 0));
+                }
+            });
+
+            const data = [];
+            const cursor = new Date(start);
+            while (cursor <= now) {
+                const isoDate = cursor.toISOString().slice(0, 10);
+                data.push({
+                    date: isoDate,
+                    label: `${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+                    seconds: dayTotals.get(isoDate) || 0
+                });
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            const hasData = data.some(item => item.seconds > 0);
+            focusChart.innerHTML = '';
+
+            if (!hasData) {
+                const empty = document.createElement('div');
+                empty.className = 'focus-empty';
+                empty.textContent = '暂无专注记录';
+                focusChart.appendChild(empty);
+                return;
+            }
+
+            const maxSeconds = Math.max(...data.map(item => item.seconds));
+            const chartInner = document.createElement('div');
+            chartInner.className = 'focus-chart-inner';
+
+            data.forEach(item => {
+                const barItem = document.createElement('div');
+                barItem.className = 'focus-bar-item';
+
+                const value = document.createElement('span');
+                value.className = 'focus-bar-value';
+                value.textContent = formatDurationShort(item.seconds);
+
+                const bar = document.createElement('div');
+                bar.className = 'focus-bar';
+                const heightPercent = maxSeconds ? Math.round((item.seconds / maxSeconds) * 100) : 0;
+                bar.style.height = `${heightPercent}%`;
+                if (!item.seconds) {
+                    bar.classList.add('empty');
+                }
+                bar.title = `${item.date} · ${formatDuration(item.seconds)}`;
+
+                const label = document.createElement('span');
+                label.className = 'focus-bar-label';
+                label.textContent = item.label;
+
+                barItem.appendChild(value);
+                barItem.appendChild(bar);
+                barItem.appendChild(label);
+                chartInner.appendChild(barItem);
+            });
+
+            focusChart.appendChild(chartInner);
+        }
+
+        function updateFocusCollapse(collapsed) {
+            if (!focusPanel) return;
+            focusPanel.classList.toggle('collapsed', collapsed);
+            focusPanel.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            if (focusPanelBody) {
+                focusPanelBody.setAttribute('aria-hidden', collapsed ? 'true' : 'false');
+            }
+            if (focusCollapseBtn) {
+                focusCollapseBtn.textContent = collapsed ? '⯈' : '⯇';
+                focusCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
+        }
+
+        function initializeFocusPanel() {
+            if (!focusPanel) return;
+            loadFocusSessions();
+            const savedRange = localStorage.getItem(FOCUS_RANGE_KEY);
+            if (savedRange && ['week', 'month', 'year'].includes(savedRange)) {
+                currentFocusRange = savedRange;
+            }
+            const collapsedStored = localStorage.getItem(FOCUS_COLLAPSED_KEY) === 'true';
+            updateFocusCollapse(collapsedStored);
+
+            if (focusCollapseBtn) {
+                focusCollapseBtn.addEventListener('click', () => {
+                    const collapsed = !focusPanel.classList.contains('collapsed');
+                    updateFocusCollapse(collapsed);
+                    localStorage.setItem(FOCUS_COLLAPSED_KEY, collapsed);
+                });
+            }
+
+            focusFilterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const range = btn.dataset.range;
+                    if (!range || range === currentFocusRange) return;
+                    currentFocusRange = range;
+                    localStorage.setItem(FOCUS_RANGE_KEY, currentFocusRange);
+                    setActiveFocusFilter(currentFocusRange);
+                    renderFocusChart(currentFocusRange);
+                });
+            });
+
+            setActiveFocusFilter(currentFocusRange);
+            renderFocusChart(currentFocusRange);
+        }
+
+        startBtn?.addEventListener('click', startCountdown);
+        resetBtn?.addEventListener('click', resetCountdown);
+        pauseBtn?.addEventListener('click', pauseCountdown);
+        fullscreenBtn?.addEventListener('click', toggleFullscreen);
+
+        loadQuickTimes();
+        renderQuickTimes();
+        updateDisplay(0);
+        setPauseBtn(false);
+        initializeFocusPanel();
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,550 @@
+/* :root 定义的 CSS 变量 */
+:root {
+    --panel-bg: rgba(10, 16, 26, 0.82);
+    --app-bg: rgba(6, 12, 22, 0.78);
+    --border-glow: rgba(0, 255, 214, 0.35);
+    --border-strong: rgba(0, 255, 214, 0.55);
+    --accent: #00ffd2;
+    --accent-soft: rgba(0, 255, 214, 0.18);
+    --text-main: #f4f8ff;
+    --text-dim: #8fa0c6;
+    --text-muted: #50608c;
+    --shadow-strong: 0 24px 48px rgba(0, 0, 0, 0.45);
+    --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.35);
+    --focus-radius: 22px;
+    --transition-fast: 0.2s ease;
+    --transition-slow: 0.35s ease;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 48px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    background: #050914;
+    color: var(--text-main);
+    font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+}
+
+.stars,
+.twinkling {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.layout {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(64px, 320px) minmax(0, 1fr) minmax(64px, 320px);
+    gap: 48px;
+    width: 100%;
+    margin: 0;
+    align-items: start;
+    justify-items: stretch;
+    box-sizing: border-box;
+}
+
+.layout-spacer {
+    grid-column: 3;
+    width: 100%;
+    max-width: 320px;
+    pointer-events: none;
+}
+
+/* 聚焦面板样式 */
+.focus-panel {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--focus-radius);
+    padding: 24px;
+    transition: width var(--transition-slow), padding var(--transition-slow), transform var(--transition-slow);
+    overflow: hidden;
+    max-width: 320px;
+    width: 100%;
+}
+
+.focus-panel.collapsed {
+    width: 64px;
+    max-width: 64px;
+    padding: 20px 12px;
+    gap: 0;
+}
+
+.focus-panel.collapsed .focus-panel-header {
+    justify-content: center;
+    gap: 0;
+}
+
+.focus-panel.collapsed .focus-title,
+.focus-panel.collapsed .focus-panel-body {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-12px);
+}
+
+.focus-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.focus-title {
+    font-size: 1.15rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #dffcff;
+    transition: opacity var(--transition-fast);
+}
+
+.focus-collapse {
+    width: 36px;
+    height: 36px;
+    border-radius: 16px;
+    border: 1px solid var(--border-glow);
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 1rem;
+    display: grid;
+    place-items: center;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.focus-collapse:hover {
+    background: rgba(0, 255, 214, 0.15);
+    transform: scale(1.05);
+}
+
+.focus-panel-body {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
+}
+
+.focus-filters {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+}
+
+.focus-filter {
+    flex: 1;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    padding: 8px 0;
+    font-size: 0.9rem;
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.focus-filter:hover {
+    border-color: var(--border-glow);
+    color: var(--accent);
+}
+
+.focus-filter.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: var(--border-strong);
+    box-shadow: 0 0 14px rgba(0, 255, 214, 0.25);
+}
+
+.focus-chart {
+    min-height: 240px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(0, 255, 214, 0.12);
+    border-radius: 18px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+}
+
+.focus-chart-inner {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(28px, 1fr));
+    gap: 10px;
+    align-items: end;
+}
+
+.focus-bar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.focus-bar {
+    width: 100%;
+    min-height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(0, 255, 214, 0.92), rgba(0, 140, 214, 0.65));
+    box-shadow: 0 6px 18px rgba(0, 255, 214, 0.3);
+    transition: height var(--transition-slow), opacity var(--transition-fast);
+}
+
+.focus-bar.empty {
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+    opacity: 0.45;
+}
+
+.focus-bar-value {
+    font-size: 0.65rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+}
+
+.focus-bar-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+}
+
+.focus-empty {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+}
+
+/* 应用程序样式 */
+.app {
+    grid-column: 2;
+    border-radius: var(--focus-radius);
+    padding: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.app-inner {
+    width: min(640px, 100%);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.title {
+    margin: 0;
+    font-size: clamp(1.5rem, 2.8vw, 2.4rem);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #dffcff;
+    text-shadow: 0 0 14px rgba(0, 255, 214, 0.25);
+}
+
+/* 计时器显示样式 */
+.timer-display {
+    --timer-gap: clamp(2.5rem, 8vw, 4.8rem);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--timer-gap);
+    letter-spacing: 0;
+    font-size: clamp(5rem, 20vw, 11.5rem);
+    line-height: 1;
+    font-weight: 700;
+    background: linear-gradient(135deg, #00ffd2, #6fb9ff, #bd79ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 28px rgba(0, 255, 214, 0.35);
+    margin: 0 auto;
+    text-align: center;
+    transform: translateX(-80px);
+}
+
+.timer-display.completed {
+    background: none;
+    color: #ff6f8b;
+    -webkit-text-fill-color: #ff6f8b;
+    text-shadow: 0 0 18px rgba(255, 110, 139, 0.55);
+}
+
+.timer-group {
+    position: relative;
+    min-width: clamp(3.4rem, 10vw, 6.6rem);
+    display: inline-flex;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+    background: inherit;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+.timer-group[data-unit="minutes"]::before,
+.timer-group[data-unit="minutes"]::after {
+    content: ':';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: inherit;
+    font-size: 0.72em;
+    opacity: 0.9;
+    background: inherit;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    pointer-events: none;
+}
+
+.timer-group[data-unit="minutes"]::before {
+    left: calc(-0.5 * var(--timer-gap));
+}
+
+.timer-group[data-unit="minutes"]::after {
+    right: calc(-0.5 * var(--timer-gap));
+}
+
+.timer-display.completed .timer-group,
+.timer-display.completed .timer-group::before,
+.timer-display.completed .timer-group::after {
+    background: none;
+    color: #ff6f8b;
+    -webkit-text-fill-color: #ff6f8b;
+}
+
+/* 输入框样式 */
+.time-input {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+}
+
+.time-input label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+}
+
+.time-input input {
+    width: 86px;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-main);
+    text-align: center;
+    font-size: 1.2rem;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.time-input input:focus {
+    outline: none;
+    border-color: var(--border-strong);
+    box-shadow: 0 0 10px rgba(0, 255, 214, 0.35);
+}
+
+/* 常用时间按钮区 */
+.quick-times {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+
+.quick-btn {
+    padding: 10px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 255, 214, 0.25);
+    background: rgba(0, 0, 0, 0.35);
+    color: var(--text-main);
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.quick-btn:hover {
+    background: rgba(0, 255, 214, 0.18);
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+}
+
+/* 控件区样式 */
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.controls button {
+    border: none;
+    border-radius: 16px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, rgba(0, 255, 214, 0.18), rgba(0, 121, 214, 0.18));
+    color: var(--text-main);
+    font-size: 1rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+    backdrop-filter: blur(6px);
+}
+
+.controls button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35);
+    background: linear-gradient(135deg, rgba(0, 255, 214, 0.32), rgba(0, 132, 255, 0.32));
+}
+
+/* 暂停按钮样式 */
+#pauseBtn {
+    position: relative;
+    width: 60px;
+    padding: 14px 0;
+}
+
+#pauseBtn::before {
+    content: '\23F8';
+    font-size: 1.6rem;
+    display: block;
+}
+
+#pauseBtn[data-paused]::before {
+    content: '\23EF';
+}
+
+/* 全屏按钮样式 */
+#fullscreenBtn {
+    position: fixed;
+    right: 32px;
+    bottom: 32px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 255, 214, 0.32);
+    background: rgba(0, 0, 0, 0.45);
+    color: var(--text-main);
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.42);
+    display: grid;
+    place-items: center;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+    z-index: 10;
+}
+
+#fullscreenBtn::before {
+    content: '\26F6';
+    font-size: 1.8rem;
+}
+
+#fullscreenBtn:hover {
+    transform: scale(1.1);
+    border-color: var(--border-strong);
+}
+
+/* 响应式 */
+@media (max-width: 1080px) {
+    body {
+        padding: 32px 16px 72px;
+        align-items: stretch;
+    }
+
+    .layout {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        width: 100%;
+    }
+
+    .focus-panel {
+        grid-column: 1;
+        position: relative;
+        max-width: none;
+        width: 100%;
+    }
+
+    .focus-panel.collapsed {
+        width: 100%;
+        max-width: none;
+        padding: 20px;
+    }
+
+    .focus-panel.collapsed .focus-title,
+    .focus-panel.collapsed .focus-panel-body {
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+    }
+
+    .layout-spacer {
+        display: none;
+    }
+
+    .app {
+        grid-column: 1;
+        padding: 24px;
+    }
+
+    .focus-collapse {
+        transform: rotate(-90deg);
+    }
+}
+
+@media (max-width: 640px) {
+    body {
+        padding: 24px 16px 96px;
+    }
+
+    .app {
+        padding: 24px;
+    }
+
+    .time-input {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .time-input input {
+        width: 100%;
+    }
+
+    .controls {
+        gap: 12px;
+    }
+
+    #fullscreenBtn {
+        bottom: 20px;
+        right: 20px;
+        width: 52px;
+        height: 52px;
+    }
+
+    #fullscreenBtn::before {
+        font-size: 1.6rem;
+    }
+}
